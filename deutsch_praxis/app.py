@@ -30,6 +30,16 @@ def load_lexicon() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+@st.cache_data(show_spinner=False)
+def build_lexicon_from_bytes(pdf_bytes: bytes) -> pd.DataFrame:
+    # Cache key is the bytes content; this persists across reruns on Cloud
+    tmp_pdf = Path(st.experimental_get_query_params().get("_tmp_dir", [str(Path.cwd())])[0]) / "uploaded.pdf"
+    tmp_pdf.write_bytes(pdf_bytes)
+    from data.preprocess import extract_lexicon_entries
+    df = extract_lexicon_entries(tmp_pdf)
+    return df
+
+
 def main():
     st.set_page_config(page_title="Deutsch Lexicon Trainer", page_icon="📚", layout="centered")
     st.title("Deutsch Lexicon Trainer")
@@ -37,24 +47,42 @@ def main():
 
     # Upload + rebuild flow
     with st.expander("Upload dictionary PDF"):
-        uploaded_pdf = st.file_uploader("Upload a PDF", type=["pdf"], accept_multiple_files=False)
+        uploaded_pdf = st.file_uploader("Upload a PDF", type=["pdf"], accept_multiple_files=False, key="pdf_upload")
         if uploaded_pdf is not None:
-            DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(PDF_PATH, "wb") as f:
-                f.write(uploaded_pdf.read())
-            with st.status("Processing PDF into lexicon…", expanded=True) as status:
-                status.update(label="Parsing entries", state="running")
-                try:
-                    from data.preprocess import extract_lexicon_entries
-                    df_new = extract_lexicon_entries(PDF_PATH)
-                    status.update(label="Saving CSV", state="running")
-                    df_new.to_csv(DATA_PATH, index=False)
-                    st.cache_data.clear()
-                    status.update(label=f"Done: {len(df_new)} entries", state="complete")
-                    st.success(f"Rebuilt lexicon with {len(df_new)} entries.")
-                except Exception as e:
-                    status.update(label="Failed", state="error")
-                    st.error(f"Failed to rebuild lexicon: {e}")
+            st.info("PDF selected. Click 'Build lexicon' to process.")
+            if st.button("Build lexicon from uploaded PDF", key="process_pdf"):
+                with st.status("Processing PDF into lexicon…", expanded=True) as status:
+                    status.update(label="Parsing entries", state="running")
+                    try:
+                        pdf_bytes = uploaded_pdf.getvalue()
+                        df_new = build_lexicon_from_bytes(pdf_bytes)
+                        status.update(label="Saving CSV", state="running")
+                        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+                        df_new.to_csv(DATA_PATH, index=False)
+                        st.cache_data.clear()
+                        status.update(label=f"Done: {len(df_new)} entries", state="complete")
+                        st.success(f"Rebuilt lexicon with {len(df_new)} entries.")
+                        st.session_state["pdf_processed"] = True
+                    except Exception as e:
+                        status.update(label="Failed", state="error")
+                        st.error(f"Failed to rebuild lexicon: {e}")
+        else:
+            # Optional button to rebuild from an already present PDF on disk
+            if PDF_PATH.exists() and st.button("Rebuild lexicon from existing PDF", key="rebuild_from_disk"):
+                with st.status("Processing existing PDF…", expanded=True) as status:
+                    status.update(label="Parsing entries", state="running")
+                    try:
+                        from data.preprocess import extract_lexicon_entries
+                        df_new = extract_lexicon_entries(PDF_PATH)
+                        status.update(label="Saving CSV", state="running")
+                        df_new.to_csv(DATA_PATH, index=False)
+                        st.cache_data.clear()
+                        status.update(label=f"Done: {len(df_new)} entries", state="complete")
+                        st.success(f"Rebuilt lexicon with {len(df_new)} entries.")
+                        st.session_state["pdf_processed"] = True
+                    except Exception as e:
+                        status.update(label="Failed", state="error")
+                        st.error(f"Failed to rebuild lexicon: {e}")
 
     df = load_lexicon()
 
