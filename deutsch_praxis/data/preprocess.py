@@ -39,7 +39,8 @@ def extract_lexicon_entries(pdf_path: Path) -> pd.DataFrame:
     for l in content_lines:
         if not l:
             continue
-        parts = re.split(r"\s[-–—]\s", l, maxsplit=1)
+        # Split on hyphen/minus, en dash, or em dash with optional spaces
+        parts = re.split(r"\s*[-–—]\s*", l, maxsplit=1)
         if len(parts) == 2:
             german, translation = parts[0].strip(), parts[1].strip()
             if german and translation:
