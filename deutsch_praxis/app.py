@@ -9,6 +9,45 @@ from typing import List
 
 DATA_PATH = Path(__file__).parent / "data" / "lexicon.csv"
 PDF_PATH = Path(__file__).parent / "data" / "Deutsch.pdf"
+CACHE_PATH = Path(__file__).parent / "data" / "session_cache.json"
+
+
+def load_persistent_cache():
+    """Load cached sample_df and examples from disk if available."""
+    if CACHE_PATH.exists():
+        try:
+            with open(CACHE_PATH, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+            return cache
+        except Exception:
+            return {}
+    return {}
+
+
+def save_persistent_cache(sample_df=None, examples_raw=None):
+    """Save sample_df and examples to disk for persistence across reloads."""
+    cache = {}
+    if sample_df is not None:
+        # Convert DataFrame to dict for JSON serialization
+        cache['sample_df'] = sample_df.to_dict(orient='records')
+    if examples_raw is not None:
+        cache['examples_raw'] = examples_raw
+    
+    try:
+        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CACHE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.warning(f"Could not save cache: {e}")
+
+
+def clear_persistent_cache():
+    """Clear the persistent cache file."""
+    if CACHE_PATH.exists():
+        try:
+            CACHE_PATH.unlink()
+        except Exception:
+            pass
 
 
 @st.cache_data
@@ -73,6 +112,7 @@ def main():
                         DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
                         df_new.to_csv(DATA_PATH, index=False)
                         st.cache_data.clear()
+                        clear_persistent_cache()  # Clear old cached words/examples
                         status.update(label=f"Done: {len(df_new)} entries", state="complete")
                         st.success(f"Rebuilt lexicon with {len(df_new)} entries.")
                         st.session_state["pdf_processed"] = True
@@ -90,6 +130,7 @@ def main():
                         status.update(label="Saving CSV", state="running")
                         df_new.to_csv(DATA_PATH, index=False)
                         st.cache_data.clear()
+                        clear_persistent_cache()  # Clear old cached words/examples
                         status.update(label=f"Done: {len(df_new)} entries", state="complete")
                         st.success(f"Rebuilt lexicon with {len(df_new)} entries.")
                         st.session_state["pdf_processed"] = True
@@ -105,9 +146,21 @@ def main():
 
     st.success(f"Loaded {len(df)} entries from lexicon.")
 
+    # Load persistent cache on first run
+    if "sample_df" not in st.session_state and "examples_raw" not in st.session_state:
+        cache = load_persistent_cache()
+        if cache.get('sample_df'):
+            st.session_state["sample_df"] = pd.DataFrame(cache['sample_df'])
+        if cache.get('examples_raw'):
+            st.session_state["examples_raw"] = cache['examples_raw']
+
     n = st.number_input("Number of words for today", min_value=1, max_value=max(1, len(df)), value=min(10, len(df)))
     if st.button("Generate n words for today"):
         st.session_state["sample_df"] = df.sample(n=int(n), replace=False, random_state=None).reset_index(drop=True)
+        # Clear old examples when new words are generated
+        if "examples_raw" in st.session_state:
+            del st.session_state["examples_raw"]
+        save_persistent_cache(sample_df=st.session_state["sample_df"], examples_raw=None)
 
     if "sample_df" in st.session_state:
         sample_df = st.session_state["sample_df"]
@@ -124,6 +177,7 @@ def main():
                     try:
                         examples_text = generate_examples(words, st.session_state["openai_api_key"])
                         st.session_state["examples_raw"] = examples_text
+                        save_persistent_cache(sample_df=st.session_state["sample_df"], examples_raw=examples_text)
                     except Exception as e:
                         st.error(f"LLM request failed: {e}")
 
