@@ -324,6 +324,17 @@ def inject_custom_css():
         box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
     }
     
+    /* DataFrame Text Wrapping */
+    .stDataFrame [data-testid="stDataFrameResizable"] {
+        width: 100% !important;
+    }
+    
+    [data-testid="stDataFrame"] td div {
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    
     /* Page Title Styling */
     .page-title {
         text-align: center;
@@ -910,7 +921,16 @@ def render_dictionary_page(df: pd.DataFrame):
     if "sample_df" in st.session_state:
         sample_df = st.session_state["sample_df"]
         st.subheader("📝 Today's Words")
-        st.dataframe(sample_df, use_container_width=True)
+        # Display with text wrapping
+        st.dataframe(
+            sample_df, 
+            use_container_width=True,
+            column_config={
+                "german": st.column_config.TextColumn("German", width="medium"),
+                "translation": st.column_config.TextColumn("Translation", width="large"),
+            },
+            hide_index=True
+        )
 
         with col2:
             if st.button("💡 Get Example Sentences", key="examples_btn", use_container_width=True):
