@@ -1,0 +1,44 @@
+{
+  "sample_df": [
+    {
+      "german": "Veralten (te; t)",
+      "translation": "устаревать"
+    },
+    {
+      "german": "Das kommt darauf an, inwiefern …",
+      "translation": "это зависит от того, насколько\\каким образом"
+    },
+    {
+      "german": "Es lässt vermuten, dass",
+      "translation": "можно предположить, это позволяет предположить"
+    },
+    {
+      "german": "Hier und da",
+      "translation": "тут и там, то тут то там"
+    },
+    {
+      "german": "Was für diese Entscheidung meines Erachtens ausschlaggebend ist, ist …",
+      "translation": "самое"
+    },
+    {
+      "german": "In erster Linie sind wir für die Sicherheit der Mitarbeiter verantwortlich.",
+      "translation": "В первую очередь"
+    },
+    {
+      "german": "Die Lampe leuchtet (te;t)",
+      "translation": "лампа светится"
+    },
+    {
+      "german": "aufwendig",
+      "translation": "затратный, трудоёмкий, роскошный"
+    },
+    {
+      "german": "nicht im Geringsten / keineswegs",
+      "translation": "ни в малейшей степени, нисколько"
+    },
+    {
+      "german": "Verflucht sei der Tag, an dem …",
+      "translation": "да будет проклят тот день, когда"
+    }
+  ]
+}
