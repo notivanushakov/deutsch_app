@@ -35,8 +35,42 @@ def extract_lexicon_entries(pdf_path: Path) -> pd.DataFrame:
 
     content_lines = lines[start_idx:end_idx]
 
-    entries = []
+    # Pattern to detect if a line starts like a new German entry:
+    # - Starts with an article (Der/Die/Das/Ein/Eine) followed by letter
+    # - Starts with a German word (capital letter + lowercase)
+    # - Starts with common verb patterns (lowercase: sich, etwas, jdm, etc.)
+    # - Starts with lowercase verb + conjugation in parentheses
+    # Lines that DON'T match this are continuations (e.g., Cyrillic text, lowercase words)
+    new_entry_pattern = re.compile(
+        r'^(Der|Die|Das|Ein|Eine|der|die|das|ein|eine)\s+[A-ZÄÖÜa-zäöüß]|'
+        r'^[A-ZÄÖÜ][a-zäöüß]+(\s|,|\(|$)|'
+        r'^(Sich|sich|etwas|jdm|jdn|für|auf|an|im|In|in|zu|Zu|Wir|Wenn|Was|Es|Ich|Mit|Bis|Hier|Meine|Mein|Alles|Daran|Etw|Auf|Von|von|Unter|unter|Am|am|nicht|Nicht)\s|'
+        r'^[\.\…]|'
+        r'^[a-zäöü]{2,}\s+(die|der|das|den|dem|einen|einem|einer|A|D|G)\s|'  # lowercase phrase with article
+        r'^[a-zäöü]{2,}\s*(\(|–|-|=)|'  # lowercase verb followed by parentheses or dash (e.g., "einbinden (...")
+        r'^[a-zäöü]+\s+[a-zäöü]+\s*\('  # lowercase + word + parenthesis (e.g., "aufgeschlossen gegenüber (Dat.)")
+    )
+    
+    # Merge continuation lines: if a line doesn't look like a new entry start,
+    # it's a continuation of the previous line
+    merged_lines = []
     for l in content_lines:
+        if not l:
+            continue
+        # Check if this line looks like the start of a new entry
+        is_new_entry = new_entry_pattern.match(l)
+        
+        # Also check: if line starts with Cyrillic, it's definitely a continuation
+        starts_with_cyrillic = bool(re.match(r'^[а-яА-ЯёЁ]', l))
+        
+        if merged_lines and (not is_new_entry or starts_with_cyrillic):
+            # This line doesn't start like a new entry - it's a continuation
+            merged_lines[-1] = merged_lines[-1] + " " + l
+        else:
+            merged_lines.append(l)
+
+    entries = []
+    for l in merged_lines:
         if not l:
             continue
         # Split on hyphen/minus, en dash, or em dash with optional spaces
