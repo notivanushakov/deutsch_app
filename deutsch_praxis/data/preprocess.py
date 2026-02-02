@@ -44,10 +44,11 @@ def extract_lexicon_entries(pdf_path: Path) -> pd.DataFrame:
     new_entry_pattern = re.compile(
         r'^(Der|Die|Das|Ein|Eine|der|die|das|ein|eine)\s+[A-ZÄÖÜa-zäöüß]|'
         r'^[A-ZÄÖÜ][a-zäöüß]+(\s|,|\(|$)|'
-        r'^(Sich|sich|etwas|jdm|jdn|für|auf|an|im|In|in|zu|Zu|Wir|Wenn|Was|Es|Ich|Mit|Bis|Hier|Meine|Mein|Alles|Daran|Etw|Auf|Von|von|Unter|unter|Am|am|nicht|Nicht)\s|'
+        r'^(Sich|sich|etwas|jdm|jdn|für|auf|im|In|in|zu|Zu|Wir|Wenn|Was|Es|Ich|Mit|Bis|Hier|Meine|Mein|Alles|Daran|Etw|Auf|Von|von|Unter|unter|Am|am|nicht|Nicht)\s+[A-ZÄÖÜa-zäöüß]|'
+        r'^an\s+(seine|A|D|G|jdn|jdm|etw)|'  # "an" only with specific continuations
         r'^[\.\…]|'
         r'^[a-zäöü]{2,}\s+(die|der|das|den|dem|einen|einem|einer|A|D|G)\s|'  # lowercase phrase with article
-        r'^[a-zäöü]{2,}\s*(\(|–|-|=)|'  # lowercase verb followed by parentheses or dash (e.g., "einbinden (...")
+        r'^[a-zäöü]{3,}\s*(\(|–|-|=)|'  # lowercase verb (3+ chars) followed by parentheses or dash
         r'^[a-zäöü]+\s+[a-zäöü]+\s*\('  # lowercase + word + parenthesis (e.g., "aufgeschlossen gegenüber (Dat.)")
     )
     
@@ -73,8 +74,16 @@ def extract_lexicon_entries(pdf_path: Path) -> pd.DataFrame:
     for l in merged_lines:
         if not l:
             continue
-        # Split on hyphen/minus, en dash, or em dash with optional spaces
-        parts = re.split(r"\s*[-–—]\s*", l, maxsplit=1)
+        # Split on en dash or em dash first (preferred separators)
+        # These are the proper separators between German and translation
+        parts = re.split(r"\s*[–—]\s*", l, maxsplit=1)
+        
+        # If no en/em dash found, try hyphen but avoid splitting on plural suffixes
+        # like -en, -e, -er, -s, -n which are common German grammatical notations
+        if len(parts) == 1:
+            # Split on hyphen only if followed by Cyrillic or longer text (not short suffixes)
+            parts = re.split(r"\s+-\s+(?=[а-яА-ЯёЁa-zA-Z]{3,})", l, maxsplit=1)
+        
         if len(parts) == 2:
             german, translation = parts[0].strip(), parts[1].strip()
             if german and translation:
